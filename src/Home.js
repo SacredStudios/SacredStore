@@ -13,7 +13,7 @@ const Home = () => {
             <div className="home__row">
                 <Product 
                 id="100"
-                title="N64 Era Mario Action Figure"
+                title="Custom N64 Era Mario Action Figure (Super Mario 64)"
                 image="/placeholder_product.jpg"
                 price={75}
                 rating={5}/>
