@@ -1,0 +1,30 @@
+import React from 'react'
+import "./Home.css"
+import Product from "./Product"
+
+const Home = () => {
+  return (
+    <div class="home">
+        <div class="home__container">
+            <img 
+            className="home__image"
+            src ="/banner.png"
+            alt=""></img>
+            <div className="home__row">
+                <Product 
+                id="100"
+                title="N64 Era Mario Action Figure"
+                image="/placeholder_product.jpg"
+                price={75}
+                rating={5}/>
+            </div>
+            <div className="home__row">
+                <Product />
+                <Product />
+            </div>
+        </div>
+    </div>
+  )
+}
+
+export default Home
