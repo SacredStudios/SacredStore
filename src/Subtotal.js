@@ -8,17 +8,18 @@ const Subtotal = () => {
         renderText={(value) => (
             <>
                 <p>
-                    Subtotal ({basket.length} items):
+                    Subtotal (0)
                     <strong>{ ` ${value}`}</strong>
                 </p>
             </>
         )}
         decimalScale={2}
-        value={getBasketTotal(basket)}
+        value={0}
         displayType={"text"}
         thousandSeparator={true}
         prefix={"$"}
         />
+        <button>Proceed to Checkout</button>
     </div>
   ) 
 }
