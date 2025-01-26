@@ -1,0 +1,91 @@
+.login {
+    background-color: white;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.login__logo {
+    margin-top: 20px;
+    margin-bottom: 20px;
+    object-fit: cover;
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    margin-right: auto;
+    margin-left: auto; 
+    display: block; 
+}
+
+.login__container {
+    width: 300px;
+    height: fit-content;
+    display: flex;
+    flex-direction: column;
+    border-radius: 5px;
+    border: 1px solid lightgray;
+    padding: 20px;
+    background-color: rgb(238, 250, 255);
+    z-index: 1;
+    border-radius: 8px;   
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.login__container > h1 {
+    font-weight: 300;
+    font-size: xx-large;
+    margin-bottom: 20px;
+}
+
+.login__container > form > h5 {
+    margin-bottom: 5px;
+}
+
+.login__container > form > input {
+    height: 30px;
+    margin-bottom: 10px;
+    background-color: white;
+    width: 98%;
+    background-color: rgb(255, 255, 255);
+    z-index: 1;
+    border-radius: 8px;   
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    outline: none; /* Basic outline removal */
+    border: 1px solid #cccccc00; /* Optional: define a visible border to replace the outline */
+}
+
+.login__signInButton {
+    background: #94daff;
+    margin-top: 10px;
+    outline: none;
+    border: none;
+    width: 100%;
+    padding: 12px 24px;                 
+    border-radius: 8px;            
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;          
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    cursor: pointer;             
+    transition: background 0.3s ease;
+
+}
+
+.login__signInButton:hover {
+    background: #5cbff0; 
+  }
+
+  .login__registerButton {
+    background: #f2f2f2;
+    margin-top: 20px;
+    outline: none;
+    border: none;
+    width: 100%;
+    padding: 12px 24px;                 
+    border-radius: 8px;            
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;          
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    cursor: pointer;             
+    transition: background 0.3s ease;
+  }
