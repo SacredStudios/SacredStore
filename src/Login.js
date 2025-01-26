@@ -1,48 +1,79 @@
-import React from 'react'
-import "./Login.css"
-import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import "./Login.css";
+
+import { auth } from './firebase'; // Import the configured auth instance
+import { createUserWithEmailAndPassword } from "firebase/auth";
+
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
-    const signIn = e => {
+    const signIn = (e) => {
         e.preventDefault();
-        console.log("i am signing in");
-    }
+        // Add sign-in logic here later
+        console.log("Sign-in functionality to be implemented.");
+    };
 
-    const register = e => {
+    const register = (e) => {
         e.preventDefault();
+        createUserWithEmailAndPassword(auth, email, password)
+            .then((userCredential) => {
+                // Successfully created a user
+                console.log("User registered:", userCredential.user);
+            })
+            .catch((error) => {
+                alert(error.message);
+            });
+    };
 
-        
-    }
     return (
         <div className="login">
             <Link to='/'>
-        <img 
-            className="login__logo"
-            src="Logo.png"
-        />
-        </Link>
+                <img
+                    className="login__logo"
+                    src="Logo.png"
+                    alt="Logo"
+                />
+            </Link>
 
-        <div class="login__container">
-            <h1>Sign In</h1>
-            <form>
-                <h5>Email</h5>
-                <input type="text" value={email} onChange={e => setEmail(e.target.value)} placeholder="Enter email" />
+            <div className="login__container">
+                <h1>Sign In</h1>
+                <form>
+                    <h5>Email</h5>
+                    <input
+                        type="text"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Enter email"
+                    />
 
-                <h5>Password</h5>
-                <input type="password" value={password} onChange={e =>setPassword(e.target.value)} placeholder="Enter password" />
-                <button className="login__signInButton" type="submit" onClick={signIn}>Sign In</button>
+                    <h5>Password</h5>
+                    <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Enter password"
+                    />
 
-            </form>
+                    <button
+                        className="login__signInButton"
+                        type="submit"
+                        onClick={signIn}
+                    >
+                        Sign In
+                    </button>
+                </form>
 
-            <button className="login__registerButton" onClick={register}>Create an account</button>
-            
-
+                <button
+                    className="login__registerButton"
+                    onClick={register}
+                >
+                    Create an account
+                </button>
+            </div>
         </div>
-        </div>
-    )
-    }
+    );
+};
 
-    export default Login
+export default Login;
