@@ -9,7 +9,7 @@
     "@mui/material": "^6.3.0",
     "cra-template": "1.2.0",
     "css-select": "^5.1.0",
-    "firebase": "^11.1.0",
+    "firebase": "^11.2.0",
     "nth-check": "^2.0.1",
     "react": "^17.0.2",
     "react-currency-format": "^1.1.0",
