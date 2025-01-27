@@ -1,18 +1,27 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import "./Login.css";
 
-import { auth } from './firebase'; // Import the configured auth instance
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { auth } from './firebase';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 
 const Login = () => {
+    const navigate = useNavigate();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    
 
     const signIn = (e) => {
         e.preventDefault();
-        // Add sign-in logic here later
-        console.log("Sign-in functionality to be implemented.");
+
+        signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+            console.log("Signed in successfully:", userCredential.user);
+            navigate("/");
+        })
+        .catch((error) => {
+            alert(error.message);
+        });
     };
 
     const register = (e) => {
@@ -21,6 +30,9 @@ const Login = () => {
             .then((userCredential) => {
                 // Successfully created a user
                 console.log("User registered:", userCredential.user);
+                if (auth) {
+                    navigate("/");
+                }
             })
             .catch((error) => {
                 alert(error.message);
