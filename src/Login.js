@@ -87,7 +87,7 @@ const Login = () => {
       <Link to='/'>
         <img
           className="login__logo"
-          src="Logo.png"
+          src="/logo.png"
           alt="Logo"
         />
       </Link>
