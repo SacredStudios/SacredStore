@@ -128,11 +128,16 @@ const Login = () => {
         </button>
 
         {/* 4. Google Sign-In Button */}
-        <button
-          className="login__googleButton"
-          onClick={signInWithGoogle}
-        >
-          Sign in with Google
+        <button className="login__registerButton" onClick={signInWithGoogle}>
+        Sign in with{" "}
+        <span className="googleLogoText">
+            <span style={{ color: "#4285F4" }}>G</span>
+            <span style={{ color: "#DB4437" }}>o</span>
+            <span style={{ color: "#F4B400" }}>o</span>
+            <span style={{ color: "#4285F4" }}>g</span>
+            <span style={{ color: "#0F9D58" }}>l</span>
+            <span style={{ color: "#DB4437" }}>e</span>
+        </span>
         </button>
       </div>
     </div>
