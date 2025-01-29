@@ -100,7 +100,7 @@ const Login = () => {
             type="text"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Enter email"
+            placeholder="Enter email..."
           />
 
           <h5>Password</h5>
@@ -108,7 +108,7 @@ const Login = () => {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter password"
+            placeholder="Enter password..."
           />
 
           <button

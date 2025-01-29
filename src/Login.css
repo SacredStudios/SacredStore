@@ -1,10 +1,12 @@
 .login {
-    background-color: white;
+    background: linear-gradient(135deg, #ffffff 0%, #3498db 100%);
     height: 100vh;
+    margin: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-}
+    justify-content: center;
+  }
 
 .login__logo {
     margin-top: 20px;
@@ -16,8 +18,22 @@
     margin-right: auto;
     margin-left: auto; 
     display: block; 
+    transition: transform 0.8s ease-in-out;
 }
 
+
+.login__logo:hover {
+    animation: spinOnce 0.8s ease-in-out forwards;
+  }
+
+  @keyframes spinOnce {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
 .login__container {
     width: 300px;
     height: fit-content;
@@ -54,6 +70,11 @@
     outline: none; /* Basic outline removal */
     border: 1px solid #cccccc00; /* Optional: define a visible border to replace the outline */
 }
+
+.login__container h5 {
+    color: #555; /* slightly gray */
+    margin-bottom: 5px;
+  }
 
 .login__signInButton {
     background: #94daff;
