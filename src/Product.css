@@ -44,6 +44,7 @@
 
   .product__rating {
     display: flex;
+    color: #FFD700;
   }
 .product__info {
     width: 100%;

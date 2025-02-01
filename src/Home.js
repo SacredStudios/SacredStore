@@ -17,6 +17,7 @@ const Home = () => {
                 image="/placeholder_product.jpg"
                 price={75}
                 rating={5}/>
+                <Product />
             </div>
             <div className="home__row">
                 <Product />
