@@ -3,6 +3,7 @@ import Header from './Header';
 import Home from "./Home";
 import Checkout from "./Checkout";
 import Login from "./Login";
+import Payment from "./Payment"
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { auth } from './firebase';
@@ -17,6 +18,7 @@ const Layout = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/payment" element={<Payment />} />
         <Route path="/" element={<Home />} />
       </Routes>
     </div>
