@@ -9,6 +9,11 @@ import { useEffect } from 'react';
 import { auth } from './firebase';
 import { useStateValue } from "./StateProvider";
 
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
+
+const promise = loadStripe('pk_live_51QoH15Lx9xG3paMnnC7ySSjLva7iHRYZjmJet52MKXRdiiMeNCOBVIwM7zFrJVX1RL9k757lylKmzzhLdJtvSUnE00uhDODTkQ');
+
 const Layout = () => {
   const location = useLocation();
 
@@ -18,7 +23,14 @@ const Layout = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/checkout" element={<Checkout />} />
-        <Route path="/payment" element={<Payment />} />
+        <Route
+          path="/payment"
+          element={
+            <Elements stripe={promise}>
+              <Payment />
+            </Elements>
+          }
+        />  
         <Route path="/" element={<Home />} />
       </Routes>
     </div>
