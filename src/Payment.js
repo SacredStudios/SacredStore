@@ -52,9 +52,12 @@ const navigate = useNavigate();
         setSucceeded(true);
         setError(null);
         setProcessing(false);
+
+        dispatch({
+            type: 'EMPTY_BASKET'
+        })
         navigate('/orders', { replace: true });
     })
-    //const payload = await stripe
 
 
   }

@@ -3,6 +3,7 @@ import Header from './Header';
 import Home from "./Home";
 import Checkout from "./Checkout";
 import Login from "./Login";
+import Orders from "./Orders"
 import Payment from "./Payment"
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
@@ -23,6 +24,7 @@ const Layout = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/checkout" element={<Checkout />} />
+        <Route path="/orders" element={<Orders />} />
         <Route
           path="/payment"
           element={
