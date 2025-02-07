@@ -25,17 +25,21 @@ const navigate = useNavigate();
   const [clientSecret, setClientSecret] = useState(true);
 
   useEffect(() => {
-    //generate Stripe secret (required in order to make payments)
-
     const getClientSecret = async () => {
-        const response = await axios ({
-            method: 'post',
-            url: `/payments/create?total=${getBasketTotal(basket)*100}` //Stripe uses cents as units for some reason
-        });
-        setClientSecret(response.data.clientSecret)
-    }
+      try {
+        const total = getBasketTotal(basket) * 100;
+        console.log("Sending total to backend:", total);
+  
+        const response = await axios.post(`/payments/create?total=${total}`);
+  
+        setClientSecret(response.data.clientSecret);
+      } catch (err) {
+        console.error("Error fetching client secret:", err);
+      }
+    };
     getClientSecret();
-  }, [basket])
+  }, [basket]);
+  
 
   const handleSubmit = async (event) => {
     event.preventDefault();
