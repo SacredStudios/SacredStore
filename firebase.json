@@ -24,6 +24,8 @@
         "firebase-debug.*.log",
         "*.local"
       ],
+      "runtime": "nodejs20",
+      "timeoutSeconds": 60,
       "predeploy": [
         "npm --prefix \"$RESOURCE_DIR\" run lint"
       ]

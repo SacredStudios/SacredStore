@@ -1,44 +1,56 @@
 const {onRequest} = require("firebase-functions/v2/https");
-// const logger = require("firebase-functions/logger");
 const express = require("express");
 const cors = require("cors");
-const functions = require("firebase-functions");
-const stripe = require("stripe")(functions.config().stripe.secret_key);
+const admin = require("firebase-admin");
+const stripeLib = require("stripe");
 
-// App config
+/* eslint-disable require-jsdoc */
+// Initialize Firebase Admin
+admin.initializeApp();
+
+// Create an Express app
 const app = express();
-
-// Middlewares
 app.use(cors({origin: true}));
 app.use(express.json());
 
-// API routes
-app.get("/", (req, res) => {
-  res.status(200).send("Hello world!");
-});
-
-app.post("/payments/create", async (request, response) => {
+// Middleware: Verify Firebase Auth token
+async function checkAuth(req, res, next) {
+  const h = req.headers.authorization||"";
+  if (!h.startsWith("Bearer ")) return res.status(401).send("No token");
+  const idToken = h.split("Bearer ")[1];
   try {
-    const total = request.query.total;
-    console.log("Received total:", total);
+    await admin.auth().verifyIdToken(idToken);
+    return next();
+  } catch (e) {
+    console.error("Token error:", e);
+    return res.status(403).send("Unauthorized");
+  }
+}
 
+// Combine your Stripe live key
+const key1="sk_live_51QoH15Lx9xG3paMnc5QaFie6gmWwLjyGsnERu6UMUytuHd";
+const key2="IrpoTLCDOGnNCroEjnwHuNLFYWc8BRyuN2NpKoZK7W00M2JgOxxd";
+const stripe = stripeLib(key1+key2);
+
+// Test route (no auth)
+app.get("/", (req, res)=>res.send("Hello world!"));
+
+// Payment route (requires auth)
+app.post("/payments/create", checkAuth, async (req, res) => {
+  try {
+    const total = parseInt(req.query.total||"0", 10);
+    console.log("Received total:", total);
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: total,
+      amount: total-7400, // example logic
       currency: "usd",
     });
-
-    // Log the entire paymentIntent
-    // console.log("PaymentIntent object:", paymentIntent);
-
-    // console.log("Sending back:", paymentIntent.client_secret);
-    response.status(201).send({
-      clientSecret: paymentIntent.client_secret,
-    });
-  } catch (error) {
-    console.error("Error creating PaymentIntent:", error);
-    response.status(500).send({error: error.message});
+    console.log("Returning:", paymentIntent.client_secret);
+    return res.status(201).send({clientSecret: paymentIntent.client_secret});
+  } catch (e) {
+    console.error("Error:", e);
+    return res.status(500).send({error: e.message});
   }
 });
 
-// Exports (v2 style)
+// Export the v2 HTTP function
 exports.api = onRequest(app);

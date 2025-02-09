@@ -29,3 +29,29 @@
 .payment__address, .payment__items, .payment__details {
     flex: 0.8;
 }
+
+.payment__details > form {
+    max-width: 400px
+}
+
+.payment__details > h4 {
+    padding-bottom: 20px;
+}
+
+.payment__details > form > div> button {
+    background: #94daff;
+    margin-top: 10px;
+    outline: none;
+    border: none;
+    padding: 12px 24px;                 
+    border-radius: 8px;            
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;          
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    cursor: pointer;             
+    transition: background 0.3s ease;
+}
+
+.payment__details > form > div> button:hover {
+    background: #5cbff0; 
+  }
