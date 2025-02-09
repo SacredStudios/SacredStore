@@ -23,18 +23,67 @@ const Payment = () => {
   const [error, setError] = useState(null);
   const [disabled, setDisabled] = useState(true);
   const [clientSecret, setClientSecret] = useState(null);
-  const [address, setAddress] = useState(''); // Single-line address from autocomplete
+  const [address, setAddress] = useState('');
+  const [shippingCost, setShippingCost] = useState(0);
 
   const addressInputRef = useRef(null);
 
+  // Load Google Places Autocomplete and listen for address changes.
+  useEffect(() => {
+    const loadAutocomplete = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        const autocomplete = new window.google.maps.places.Autocomplete(
+          addressInputRef.current,
+          { types: ['address'] }
+        );
+        autocomplete.addListener('place_changed', async () => {
+          const place = autocomplete.getPlace();
+          const destination = place.formatted_address;
+          setAddress(destination);
+          console.log("is this running");
+          // Call the backend to get the FedEx shipping cost
+          const loc = await fetchShippingCost(destination);
+          console.log("loc, ", loc);
+        });
+      } else {
+        console.error('Google Maps API not loaded.');
+      }
+    };
+
+    if (!window.google || !window.google.maps) {
+      window.addEventListener('load', loadAutocomplete);
+    } else {
+      loadAutocomplete();
+    }
+  }, []);
+
+  // Fetch shipping cost from the backend using FedEx API.
+  const fetchShippingCost = async (destination) => {
+    try {
+      const token = await auth.currentUser.getIdToken(true);
+      const response = await axios.get(
+        `/shipping/cost?address=${encodeURIComponent(destination)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const fedexShippingCost = response.data.shippingCost;
+      setShippingCost(fedexShippingCost);
+    } catch (err) {
+      console.error('Error fetching shipping cost:', err);
+      setShippingCost(0);
+    }
+  };
+
+  // Create or update PaymentIntent once basket, address, or shipping cost changes.
   useEffect(() => {
     const getClientSecret = async () => {
-      if (!user) return;
-      const total = getBasketTotal(basket) * 100;
+      if (!user || !address) return;
+      // Calculate the total in cents (basket total + shipping cost)
+      const total = getBasketTotal(basket) * 100 + Math.round(shippingCost * 100);
       try {
         const token = await auth.currentUser.getIdToken(true);
+        // Pass both total and address so the backend can recalc if needed.
         const response = await axios.post(
-          `/payments/create?total=${total}`,
+          `/payments/create?total=${total}&address=${encodeURIComponent(address)}`,
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -43,37 +92,12 @@ const Payment = () => {
         console.error('Error fetching client secret:', err);
       }
     };
-    if (basket?.length > 0) getClientSecret();
-  }, [basket, auth, user]);
 
-  useEffect(() => {
-    const loadAutocomplete = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current, {
-          types: ['geocode'],
-        });
-  
-        autocomplete.addListener('place_changed', () => {
-          const place = autocomplete.getPlace();
-          if (place.formatted_address) {
-            setAddress(place.formatted_address);
-          } else {
-            setError('Invalid address. Please select a valid address.');
-          }
-        });
-      } else {
-        console.error("Google Maps API not loaded.");
-      }
-    };
-  
-    // Wait until the script is loaded
-    if (!window.google || !window.google.maps) {
-      window.addEventListener('load', loadAutocomplete);
-    } else {
-      loadAutocomplete();
+    if (basket?.length > 0 && address) {
+      getClientSecret();
     }
-  }, []);
-  
+  }, [basket, auth, user, shippingCost, address]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!address) {
@@ -87,12 +111,14 @@ const Payment = () => {
         payment_method: { card: elements.getElement(CardElement) },
       });
 
+      // Save order details (including shipping cost) to Firestore
       const orderRef = doc(db, 'users', user?.uid, 'orders', paymentIntent.id);
       await setDoc(orderRef, {
         basket: basket,
         amount: paymentIntent.amount,
         created: paymentIntent.created,
-        address: address, // Save the formatted address from Google Places
+        address: address,
+        shippingCost: shippingCost,
       });
 
       dispatch({ type: 'EMPTY_BASKET' });
@@ -119,13 +145,12 @@ const Payment = () => {
           Checkout <Link to="/checkout">({basket?.length} items)</Link>
         </h1>
 
-        {/* Address Input with Autocomplete */}
+        {/* Delivery Address Section */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Delivery Address</h3>
           </div>
           <div className="payment__address">
-            This is a test
             <input
               type="text"
               placeholder="Enter your address"
@@ -133,6 +158,16 @@ const Payment = () => {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
             />
+          </div>
+        </div>
+
+        {/* Shipping Cost Display */}
+        <div className="payment__section">
+          <div className="payment__title">
+            <h3>Shipping Cost</h3>
+          </div>
+          <div className="payment__shipping">
+            <p>Estimated Shipping Cost: ${shippingCost}</p>
           </div>
         </div>
 
@@ -166,7 +201,8 @@ const Payment = () => {
                 <CurrencyFormat
                   renderText={(value) => <h3>Order Total: {value}</h3>}
                   decimalScale={2}
-                  value={getBasketTotal(basket)}
+                  // Note: Adding shippingCost to basket total
+                  value={getBasketTotal(basket) + shippingCost}
                   displayType={'text'}
                   thousandSeparator={true}
                   prefix={'$'}
