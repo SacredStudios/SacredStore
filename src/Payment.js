@@ -40,10 +40,8 @@ const Payment = () => {
           const place = autocomplete.getPlace();
           const destination = place.formatted_address;
           setAddress(destination);
-          console.log("is this running");
-          // Call the backend to get the FedEx shipping cost
-          const loc = await fetchShippingCost(destination);
-          console.log("loc, ", loc);
+          console.log("Autocomplete place changed:", destination);
+          await fetchShippingCost(destination);
         });
       } else {
         console.error('Google Maps API not loaded.');
@@ -59,14 +57,26 @@ const Payment = () => {
 
   // Fetch shipping cost from the backend using FedEx API.
   const fetchShippingCost = async (destination) => {
+    console.log("fetchShippingCost: destination =", destination);
     try {
       const token = await auth.currentUser.getIdToken(true);
+      console.log("fetchShippingCost: token =", token);
       const response = await axios.get(
         `/shipping/cost?address=${encodeURIComponent(destination)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      const fedexShippingCost = response.data.shippingCost;
-      setShippingCost(fedexShippingCost);
+      console.log("fetchShippingCost: raw response data =", response.data);
+      // Check for the expected property names.
+      if (response.data.totalNetCharge !== undefined) {
+        console.log("fetchShippingCost: totalNetCharge =", response.data.totalNetCharge);
+        setShippingCost(response.data.totalNetCharge);
+      } else if (response.data.totalNetCharges !== undefined) {
+        console.log("fetchShippingCost: totalNetCharges =", response.data.totalNetCharges);
+        setShippingCost(response.data.totalNetCharges);
+      } else {
+        console.log("fetchShippingCost: no total net charge found, response data =", response.data);
+        setShippingCost(0);
+      }
     } catch (err) {
       console.error('Error fetching shipping cost:', err);
       setShippingCost(0);
@@ -87,6 +97,7 @@ const Payment = () => {
           {},
           { headers: { Authorization: `Bearer ${token}` } }
         );
+        console.log("Client secret response data:", response.data);
         setClientSecret(response.data.clientSecret);
       } catch (err) {
         console.error('Error fetching client secret:', err);
@@ -167,7 +178,10 @@ const Payment = () => {
             <h3>Shipping Cost</h3>
           </div>
           <div className="payment__shipping">
-            <p>Estimated Shipping Cost: ${shippingCost}</p>
+            <p>
+              Estimated Shipping Cost: $
+              {shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}
+            </p>
           </div>
         </div>
 
@@ -201,7 +215,6 @@ const Payment = () => {
                 <CurrencyFormat
                   renderText={(value) => <h3>Order Total: {value}</h3>}
                   decimalScale={2}
-                  // Note: Adding shippingCost to basket total
                   value={getBasketTotal(basket) + shippingCost}
                   displayType={'text'}
                   thousandSeparator={true}
