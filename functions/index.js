@@ -21,17 +21,44 @@ const key2 = "IrpoTLCDOGnNCroEjnwHuNLFYWc8BRyuN2NpKoZK7W00M2JgOxxd";
 const stripe = stripeLib(key1 + key2);
 
 /**
- * Calculates shipping using the FedEx API with a minimal payload.
- * This function parses the response and returns the first
- * "total net charge" value extracted from the rated shipment details.
+ * Extract a two-letter country code from the full address.
+ * Currently supports US, CA, MX, AU, and GB.
  *
+ * @param {string} address Full address string.
+ * @return {string} Two-letter country code.
+ */
+function getCountryCode(address) {
+  const lowerAddress = address.toLowerCase();
+  if (lowerAddress.includes("united states") || lowerAddress.includes("usa")) {
+    return "US";
+  }
+  if (lowerAddress.includes("canada") || lowerAddress.includes("bc")) {
+    return "CA";
+  }
+  if (lowerAddress.includes("mexico")) {
+    return "MX";
+  }
+  if (lowerAddress.includes("australia")) {
+    return "AU";
+  }
+  if (lowerAddress.includes("united kingdom") || lowerAddress.includes("uk")) {
+    return "GB";
+  }
+  // Add additional mappings as needed.
+  // Default to US if no match is found.
+  return "US";
+}
 
- * @param {string} destAddr
- * @return {Promise<number>}
+/**
+ * Calculate shipping costs using the FedEx Rates and Transit Times API.
+ * Supports both domestic and international shipments.
+ *
+ * @param {string} destAddr Full recipient address.
+ * @return {Promise<number>} The total net charge (shipping cost).
  */
 async function calculateFedExShipping(destAddr) {
   try {
-    // Step 1: Obtain OAuth token
+    // Step 1: Obtain the OAuth token.
     const tokenRes = await fetch(FEDEX_TOKEN_URL, {
       method: "POST",
       headers: {"Content-Type": "application/x-www-form-urlencoded"},
@@ -55,10 +82,9 @@ async function calculateFedExShipping(destAddr) {
       }
       console.error("FedEx token error response:", errorResponse);
       throw new Error(
-          "Failed to fetch token (status " +
-          tokenRes.status +
-          "): " +
-          JSON.stringify(errorResponse),
+          `Failed to fetch token (status ${tokenRes.status}): ${JSON.stringify(
+              errorResponse,
+          )}`,
       );
     }
 
@@ -73,26 +99,63 @@ async function calculateFedExShipping(destAddr) {
       throw new Error("No FedEx token in response");
     }
 
-    // Minimal payload as provided:
+    // Extract postal code using a regex (matches 5-digit or ZIP+4)
+    const zipRegex = /\b\d{5}(?:-\d{4})?\b/;
+    const zipMatch = destAddr.match(zipRegex);
+    const recipientPostalCode = zipMatch ? zipMatch[0] : "30033";
+    console.log("DEBUG: Extracted recipient ZIP code:", recipientPostalCode);
+
+    // Extract country code from the full address.
+    const recipientCountryCode = getCountryCode(destAddr);
+    console.log("DEBUG: Recipient country code:", recipientCountryCode);
+
+    // Determine the service type and set up the payload.
+    // For domestic shipments, use FEDEX_GROUND.
+    // For international shipments, use INTERNATIONAL_ECONOMY.
+    let serviceType = "FEDEX_GROUND";
     const requestBody = {
       accountNumber: {value: "204492269"},
       requestedShipment: {
+        shipDateStamp: new Date().toISOString().split("T")[0],
         shipper: {
-          address: {postalCode: "65247", countryCode: "US"},
+          address: {postalCode: "30033", countryCode: "US"},
         },
         recipient: {
-          address: {postalCode: "72348", countryCode: "US"},
+          address: {
+            postalCode: recipientPostalCode,
+            countryCode: recipientCountryCode,
+          },
         },
         pickupType: "DROPOFF_AT_FEDEX_LOCATION",
         rateRequestType: ["ACCOUNT", "LIST"],
         requestedPackageLineItems: [
-          {weight: {units: "LB", value: "10"}},
+          {weight: {units: "LB", value: "1"}},
         ],
       },
     };
 
+    // Adjust the payload for international shipments.
+    if (recipientCountryCode !== "US") {
+      serviceType = "INTERNATIONAL_ECONOMY";
+      requestBody.requestedShipment.customsClearanceDetail = {
+        // Minimal required customs details.
+        commodities: [
+          {
+            numberOfPieces: 1,
+            description: "Merchandise",
+            countryOfManufacture: "US", // Adjust as needed.
+            weight: {units: "LB", value: "1"},
+            customsValue: {currency: "USD", amount: "100"},
+          },
+        ],
+        purpose: "SOLD",
+      };
+    }
+    requestBody.requestedShipment.serviceType = serviceType;
+
     console.log("DEBUG: Payload:", JSON.stringify(requestBody, null, 2));
-    // Step 3: Send the rate request
+
+    // Step 3: Send the rate request.
     const rateRes = await fetch(FEDEX_RATE_URL, {
       method: "POST",
       headers: {
@@ -116,10 +179,9 @@ async function calculateFedExShipping(destAddr) {
       }
       console.error("FedEx rate error response:", errorRate);
       throw new Error(
-          "Failed to fetch rates (status " +
-          rateRes.status +
-          "): " +
-          JSON.stringify(errorRate),
+          `Failed to fetch rates (status ${rateRes.status}): ${JSON.stringify(
+              errorRate,
+          )}`,
       );
     }
 
@@ -133,10 +195,7 @@ async function calculateFedExShipping(destAddr) {
 
     // Parse the response and extract the first "total net charge" value.
     let netCharge = 0;
-    if (
-      rateData.output &&
-      Array.isArray(rateData.output.rateReplyDetails)
-    ) {
+    if (rateData.output && Array.isArray(rateData.output.rateReplyDetails)) {
       for (const detail of rateData.output.rateReplyDetails) {
         if (
           detail.ratedShipmentDetails &&
@@ -152,7 +211,6 @@ async function calculateFedExShipping(destAddr) {
               } else {
                 netCharge = shipment.totalNetCharge;
               }
-              // Return the first encountered value
               return netCharge;
             }
           }
@@ -171,8 +229,7 @@ async function calculateFedExShipping(destAddr) {
  *
  * @param {Object} req Express request object.
  * @param {Object} res Express response object.
- * @param {Function} next Next function to call.
- * @return {void}
+ * @param {Function} next Next function.
  */
 async function checkAuth(req, res, next) {
   const h = req.headers.authorization || "";
@@ -191,23 +248,14 @@ async function checkAuth(req, res, next) {
 
 /**
  * Test route (no auth required).
- *
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
  */
 app.get("/", (req, res) => res.send("Hello world!"));
 
 /**
  * Route to get shipping cost.
- *
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
- * @param {Function} next Next function to call.
  */
 app.get("/shipping/cost", checkAuth, async (req, res, next) => {
   try {
-    // Even though the minimal payload ignores the input address,
-    // we'll require one for consistency.
     const address = req.query.address || "";
     if (!address) {
       return res.status(400).send({error: "Address is required"});
@@ -222,10 +270,6 @@ app.get("/shipping/cost", checkAuth, async (req, res, next) => {
 
 /**
  * Route to create PaymentIntent factoring in shipping cost.
- *
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
- * @param {Function} next Next function to call.
  */
 app.post("/payments/create", checkAuth, async (req, res, next) => {
   try {
@@ -235,6 +279,7 @@ app.post("/payments/create", checkAuth, async (req, res, next) => {
     const netCharge = await calculateFedExShipping(address);
     console.log("Extracted totalNetCharge:", netCharge);
     const shipping = netCharge || 0;
+    // Adjust your calculation logic as needed.
     const finalAmount = total - 7400 + Math.round(shipping * 100);
     const paymentIntent = await stripe.paymentIntents.create({
       amount: finalAmount,
@@ -254,11 +299,6 @@ app.post("/payments/create", checkAuth, async (req, res, next) => {
 
 /**
  * Express error-handling middleware.
- *
- * @param {Error} err Error object.
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
- * @param {Function} next Next function to call.
  */
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
@@ -266,6 +306,6 @@ app.use((err, req, res, next) => {
 });
 
 /**
- * Exports the Express app as a Firebase Function.
+ * Export the Express app as a Firebase Function.
  */
 exports.api = onRequest(app);

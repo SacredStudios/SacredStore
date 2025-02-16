@@ -179,7 +179,7 @@ const Payment = () => {
           </div>
           <div className="payment__shipping">
             <p>
-              Estimated Shipping Cost: $
+              Shipping Cost: $
               {shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}
             </p>
           </div>
