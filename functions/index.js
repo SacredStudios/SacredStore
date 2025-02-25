@@ -352,10 +352,15 @@ app.post("/payments/notify", checkAuth, async (req, res, next) => {
     `;
     const mailOpts = {
       from: "jessiecoleman928@gmail.com",
-      to: req.user && req.user.email ?
+      to: [
+        req.user && req.user.email ?
           req.user.email :
           "unknown@example.com",
-      subject: `New Order from ${req.user ? req.user.email : "Unknown"}`,
+        "xsacredstudiosx@gmail.com",
+      ].join(", "),
+      subject: `New Order from ${
+        req.user ? req.user.email : "Unknown"
+      }`,
       html: orderDetails,
     };
     await transporter.sendMail(mailOpts);

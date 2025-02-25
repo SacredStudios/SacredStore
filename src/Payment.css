@@ -30,6 +30,22 @@
     flex: 0.8;
 }
 
+.payment__address input {
+    width: 100%;
+    padding: 12px 16px;
+    margin: 10px 0;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .payment__address input:focus {
+    outline: none;
+    border-color: #5cbff0;
+    box-shadow: 0 0 8px rgba(92, 191, 240, 0.5);
+  }
+
 .payment__details > form {
     max-width: 400px
 }
