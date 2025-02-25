@@ -16,7 +16,7 @@ const Home = () => {
                 title="Custom N64 Era Mario Action Figure (Super Mario 64)"
                 image="/placeholder_product.jpg"
                 price={75}
-                rating={5}/>
+                />
                 <Product />
             </div>
             <div className="home__row">
