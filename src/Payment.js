@@ -21,27 +21,33 @@ const Payment = () => {
   const [succeeded, setSucceeded] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
-  const [disabled, setDisabled] = useState(true);
+  const [cardEmpty, setCardEmpty] = useState(true);
   const [clientSecret, setClientSecret] = useState(null);
   const [address, setAddress] = useState('');
   const [shippingCost, setShippingCost] = useState(0);
+  const [taxAmount, setTaxAmount] = useState(0);
+  const [finalTotal, setFinalTotal] = useState(0);
+  const [taxCalculated, setTaxCalculated] = useState(false);
+  const [backendLoading, setBackendLoading] = useState(false);
+  const [shippingCostLoading, setShippingCostLoading] = useState(false);
 
   const addressInputRef = useRef(null);
 
-  // Load Google Places Autocomplete and listen for address changes.
   useEffect(() => {
     const loadAutocomplete = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        const autocomplete = new window.google.maps.places.Autocomplete(
-          addressInputRef.current,
-          { types: ['address'] }
-        );
+      if (
+        window.google &&
+        window.google.maps &&
+        window.google.maps.places
+      ) {
+        const autocomplete = new window.google.maps.places.
+          Autocomplete(addressInputRef.current, { types: ['address'] });
         autocomplete.addListener('place_changed', async () => {
           const place = autocomplete.getPlace();
-          const destination = place.formatted_address;
-          setAddress(destination);
-          console.log("Autocomplete place changed:", destination);
-          await fetchShippingCost(destination);
+          const dest = place.formatted_address;
+          setAddress(dest);
+          console.log("Autocomplete changed:", dest);
+          await fetchShippingCost(dest);
         });
       } else {
         console.error('Google Maps API not loaded.');
@@ -55,97 +61,118 @@ const Payment = () => {
     }
   }, []);
 
-  // Fetch shipping cost from the backend using FedEx API.
-  const fetchShippingCost = async (destination) => {
-    console.log("fetchShippingCost: destination =", destination);
+  const fetchShippingCost = async (dest) => {
+    console.log("fetchShippingCost: dest =", dest);
+    setShippingCostLoading(true);
     try {
       const token = await auth.currentUser.getIdToken(true);
-      console.log("fetchShippingCost: token =", token);
-      const response = await axios.get(
-        `/shipping/cost?address=${encodeURIComponent(destination)}`,
+      const resp = await axios.get(
+        `/shipping/cost?address=${encodeURIComponent(dest)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log("fetchShippingCost: raw response data =", response.data);
-      // Check for the expected property names.
-      if (response.data.totalNetCharge !== undefined) {
-        console.log("fetchShippingCost: totalNetCharge =", response.data.totalNetCharge);
-        setShippingCost(response.data.totalNetCharge);
-      } else if (response.data.totalNetCharges !== undefined) {
-        console.log("fetchShippingCost: totalNetCharges =", response.data.totalNetCharges);
-        setShippingCost(response.data.totalNetCharges);
+      console.log("Shipping response:", resp.data);
+      if (resp.data.totalNetCharge !== undefined) {
+        setShippingCost(resp.data.totalNetCharge);
       } else {
-        console.log("fetchShippingCost: no total net charge found, response data =", response.data);
         setShippingCost(0);
       }
     } catch (err) {
       console.error('Error fetching shipping cost:', err);
       setShippingCost(0);
+    } finally {
+      setShippingCostLoading(false);
     }
   };
 
-  // Create or update PaymentIntent once basket, address, or shipping cost changes.
+  // Auto-update PaymentIntent details as basket or address changes.
   useEffect(() => {
     const getClientSecret = async () => {
-      if (!user || !address) return;
-      // Calculate the total in cents (basket total + shipping cost)
-      const total = getBasketTotal(basket) * 100 + Math.round(shippingCost * 100);
+      setBackendLoading(true);
+      // Only basket total (in cents) is sent.
+      const total = getBasketTotal(basket) * 100;
       try {
         const token = await auth.currentUser.getIdToken(true);
-        // Pass both total and address so the backend can recalc if needed.
-        const response = await axios.post(
+        const resp = await axios.post(
           `/payments/create?total=${total}&address=${encodeURIComponent(address)}`,
-          {},
+          { basket },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Client secret response data:", response.data);
-        setClientSecret(response.data.clientSecret);
+        console.log("Client secret resp:", resp.data);
+        setClientSecret(resp.data.clientSecret);
+        if (resp.data.taxCalculation) {
+          const taxedBase = resp.data.taxCalculation.amount_total / 100;
+          setTaxAmount(resp.data.taxCalculation.tax_amount_exclusive / 100);
+          setFinalTotal(taxedBase + shippingCost);
+          setTaxCalculated(true);
+        }
       } catch (err) {
         console.error('Error fetching client secret:', err);
+      } finally {
+        setBackendLoading(false);
       }
     };
 
-    if (basket?.length > 0 && address) {
-      getClientSecret();
+    if (basket?.length > 0 && address.trim() !== '' &&
+        !shippingCostLoading) {
+      const timer = setTimeout(() => {
+        getClientSecret();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-  }, [basket, auth, user, shippingCost, address]);
+  }, [basket, shippingCost, address, shippingCostLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!address) {
+    if (!address.trim()) {
       setError('Please enter a valid address.');
       return;
     }
-
+    if (!clientSecret) {
+      setError('Client secret not ready. Please try again.');
+      return;
+    }
     setProcessing(true);
     try {
-      const { paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: { card: elements.getElement(CardElement) },
-      });
-
-      // Save order details (including shipping cost) to Firestore
-      const orderRef = doc(db, 'users', user?.uid, 'orders', paymentIntent.id);
+      const { paymentIntent } = await stripe.confirmCardPayment(
+        clientSecret, {
+          payment_method: {
+            card: elements.getElement(CardElement)
+          }
+        }
+      );
+      // After confirming payment, send order email.
+      const token = await auth.currentUser.getIdToken(true);
+      await axios.post(
+        `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
+        { basket },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Save order details in Firestore.
+      const orderRef = doc(
+        db, 'users', user?.uid, 'orders', paymentIntent.id
+      );
       await setDoc(orderRef, {
-        basket: basket,
+        basket,
         amount: paymentIntent.amount,
         created: paymentIntent.created,
-        address: address,
-        shippingCost: shippingCost,
+        address,
+        shippingCost,
+        tax: taxAmount,
       });
-
       dispatch({ type: 'EMPTY_BASKET' });
       setSucceeded(true);
       setError(null);
       setProcessing(false);
       navigate('/orders', { replace: true });
     } catch (err) {
-      console.error('Error confirming card payment:', err);
+      console.error('Error confirming payment:', err);
       setError(err.message);
       setProcessing(false);
     }
   };
 
   const handleChange = (event) => {
-    setDisabled(event.empty);
+    setCardEmpty(event.empty);
     setError(event.error ? event.error.message : '');
   };
 
@@ -155,55 +182,45 @@ const Payment = () => {
         <h1>
           Checkout <Link to="/checkout">({basket?.length} items)</Link>
         </h1>
-
-        {/* Delivery Address Section */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Delivery Address</h3>
           </div>
           <div className="payment__address">
-            <input
-              type="text"
+            <input type="text"
               placeholder="Enter your address"
               ref={addressInputRef}
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
+              onChange={(e) => setAddress(e.target.value)} />
           </div>
         </div>
-
-        {/* Shipping Cost Display */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Shipping Cost</h3>
           </div>
           <div className="payment__shipping">
             <p>
-              Shipping Cost: $
-              {shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}
+              Shipping: $
+              {shippingCost != null ?
+                Number(shippingCost).toFixed(2) : '0.00'}
+              {shippingCostLoading && " (loading...)"}
             </p>
           </div>
         </div>
-
-        {/* Review Items Section */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Review Items</h3>
           </div>
           <div className="payment__items">
             {basket.map((item) => (
-              <CheckoutProduct
-                key={item.id}
+              <CheckoutProduct key={item.id}
                 id={item.id}
                 title={item.title}
                 image={item.image}
-                price={item.price}
-              />
+                price={item.price} />
             ))}
           </div>
         </div>
-
-        {/* Payment Method Section */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Payment Method</h3>
@@ -212,16 +229,31 @@ const Payment = () => {
             <form onSubmit={handleSubmit}>
               <CardElement onChange={handleChange} />
               <div className="payment__priceContainer">
+                <p>Tax: ${taxAmount.toFixed(2)}</p>
+                <p>Shipping: $
+                  {shippingCost != null ?
+                    Number(shippingCost).toFixed(2) : '0.00'}
+                </p>
                 <CurrencyFormat
-                  renderText={(value) => <h3>Order Total: {value}</h3>}
+                  renderText={(value) => <h3>Total: {value}</h3>}
                   decimalScale={2}
-                  value={getBasketTotal(basket) + shippingCost}
+                  value={finalTotal}
                   displayType={'text'}
                   thousandSeparator={true}
-                  prefix={'$'}
-                />
-                <button disabled={processing || disabled || succeeded}>
-                  <span>{processing ? <p>Processing</p> : 'Buy Now'}</span>
+                  prefix={'$'} />
+                <button disabled={
+                  processing ||
+                  cardEmpty ||
+                  succeeded ||
+                  !taxCalculated ||
+                  backendLoading ||
+                  shippingCostLoading ||
+                  !address.trim() ||
+                  taxAmount === 0
+                }>
+                  <span>
+                    {processing ? <p>Processing</p> : 'Buy Now'}
+                  </span>
                 </button>
               </div>
               {error && <div className="payment__error">{error}</div>}
