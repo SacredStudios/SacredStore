@@ -1,25 +1,30 @@
 .home {
- display: flex;
- justify-content: center;
- margin-left: auto;
- margin-right: auto;
- max-width: 1500px;
-}
-
-.home__row {
     display: flex;
-    justify-content: center; /* Centers product boxes horizontally */
-    align-items: center;     /* (Optional) Centers items vertically */
-    z-index: 1;
-    margin-left: 5px;
-    margin-right: 5px;
-}
-
-.home__image {
+    justify-content: center;
+    margin: 0 auto;
+    max-width: 1500px;
+    position: relative;
+  }
+  
+  /* Set a fixed height for the banner image */
+  .home__image {
     width: 100%;
-    z-index: -1;
-    margin-bottom: -250px;
-    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 100%);
-}
-
+    height: 400px;        /* Adjust height as needed */
+    object-fit: cover;    /* Ensures the image fills the container */
+    display: block;
+    z-index: 0;
+  }
+  
+  /* Position the product row absolutely over the banner */
+  .home__row {
+    position: absolute;
+    top: 200px;           /* Adjust this value to raise/lower the products */
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;  /* Centers product boxes horizontally */
+    align-items: center;      /* Centers items vertically */
+    z-index: 1;
+    margin: 0 5px;
+  }
   

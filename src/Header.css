@@ -15,87 +15,93 @@
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
-
 .header__logo {
-    width: 50px;
-    object-fit: contain;
-    margin: 0 20px;
-    border-radius: 50%;
-
+  width: 50px;
+  object-fit: contain;
+  margin: 0 20px;
+  border-radius: 50%;
 }
 
 .header__search {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    border-radius: 24px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  border-radius: 24px;
 }
-.header__searchInput{
-    height: 12px;
-    padding: 10px;
-    border: none;
-    width: 100%;
+
+.header__searchInput {
+  height: 12px;
+  padding: 10px;
+  border: none;
+  width: 100%;
 }
+
 .header__searchIcon {
-    padding: 5px;
-    height: 22px;
-    background-color: #5ea9ff;
+  padding: 5px;
+  height: 22px;
+  background-color: #5ea9ff;
 }
 
 .header__optionLineOne {
-    font-size: 10px;
+  font-size: 10px;
 }
 
 .header__optionLineTwo {
-    font-size: 13px;
-    font-weight: 800;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .header__optionBasket {
-    display: flex;
-    align-items: center;
-    color: white;
-
+  display: flex;
+  align-items: center;
+  color: white;
 }
 
 .bounce {
-    animation: squashAndStretch 0.3s ease;
+  animation: squashAndStretch 0.3s ease;
+}
+
+@keyframes squashAndStretch {
+  0% {
+    transform: scale(1, 1);
   }
-  
-  @keyframes squashAndStretch {
-    0% {
-      transform: scale(1, 1);
-    }
-    25% {
-      transform: scale(1.15, 0.85);
-    }
-    50% {
-      transform: scale(0.9, 1.1);
-    }
-    75% {
-      transform: scale(1.05, 0.95);
-    }
-    100% {
-      transform: scale(1, 1);
-    }
+  25% {
+    transform: scale(1.15, 0.85);
   }
+  50% {
+    transform: scale(0.9, 1.1);
+  }
+  75% {
+    transform: scale(1.05, 0.95);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
 .header__basketCount {
-    margin-left: 10px;
-    margin-right: 10px;
-    font-size: larger;
-    text-decoration: underline;
+  margin-left: 10px;
+  margin-right: 10px;
+  font-size: larger;
+  text-decoration: underline;
 }
 
 .header__nav {
-    display: flex;
-    justify-content: space-evenly;
+  display: flex;
+  justify-content: space-evenly;
 }
 
 .header__option {
-    display: flex;
-    flex-direction: column;
-    margin-left: 10px;
-    margin-right: 10px;
-    color: white;
+  display: flex;
+  flex-direction: column;
+  margin-left: 10px;
+  margin-right: 10px;
+  color: white;
+}
 
+/* Hover effect: darken logo, options, and shopping cart icon */
+.header__logo:hover,
+.header__option:hover,
+.header__optionBasket:hover {
+  filter: brightness(0.7);
 }
