@@ -46,7 +46,7 @@ const Payment = () => {
           const place = autocomplete.getPlace();
           const dest = place.formatted_address;
           setAddress(dest);
-          console.log("Autocomplete changed:", dest);
+          console.log("Autocomplete changed");
           await fetchShippingCost(dest);
         });
       } else {
@@ -62,7 +62,7 @@ const Payment = () => {
   }, []);
 
   const fetchShippingCost = async (dest) => {
-    console.log("fetchShippingCost: dest =", dest);
+    console.log("fetchShippingCost");
     setShippingCostLoading(true);
     try {
       const token = await auth.currentUser.getIdToken(true);
@@ -70,7 +70,7 @@ const Payment = () => {
         `/shipping/cost?address=${encodeURIComponent(dest)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log("Shipping response:", resp.data);
+      console.log("Shipping responded");
       if (resp.data.totalNetCharge !== undefined) {
         setShippingCost(resp.data.totalNetCharge);
       } else {
@@ -97,7 +97,7 @@ const Payment = () => {
           { basket },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Client secret resp:", resp.data);
+        console.log("Client secret resp");
         setClientSecret(resp.data.clientSecret);
         if (resp.data.taxCalculation) {
           const taxedBase = resp.data.taxCalculation.amount_total / 100;

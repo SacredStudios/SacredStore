@@ -8,13 +8,18 @@
 
 .home__row {
     display: flex;
+    justify-content: center; /* Centers product boxes horizontally */
+    align-items: center;     /* (Optional) Centers items vertically */
     z-index: 1;
     margin-left: 5px;
     margin-right: 5px;
 }
+
 .home__image {
     width: 100%;
     z-index: -1;
     margin-bottom: -250px;
     mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 100%);
 }
+
+  

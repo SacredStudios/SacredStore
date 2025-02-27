@@ -1,58 +1,91 @@
 .product {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    margin: 10px;
-    padding: 20px;
-    width: 100%;
-    max-height: 400px;
-    min-width: 100px;
-    background-color: rgb(255, 255, 255);
-    z-index: 1;
-    border-radius: 8px;   
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  position: relative; /* Establish stacking context */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 10px;
+  padding: 20px;
+  width: 100%;
+  max-width: 300px; /* Ensure consistent sizing */
+  height: 450px;    /* Increased height for the product box */
+  background-color: transparent; /* So the image shows through */
+  border-radius: 8px;   
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  overflow: hidden; /* Keeps the overlay and image inside the box */
 }
-
-
 
 .product > img {
-    max-height: 200px;
-    width: 100%;
-    object-fit: contain;
-    margin-bottom: 15px;
-
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Scale the image to cover the container */
+  z-index: 0;        /* Place behind the overlay */
 }
 
-.product > button {
-    background: #94daff;
-    margin-top: 10px;
-    outline: none;
-    border: none;
-    padding: 12px 24px;                 
-    border-radius: 8px;            
-    font-family: 'Orbitron', sans-serif;
-    font-size: 16px;          
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-    cursor: pointer;             
-    transition: background 0.3s ease;
-  }
-  
-  .product > button:hover {
-    background: #5cbff0; 
-  }
-
-  .product__rating {
-    display: flex;
-    color: #FFD700;
-  }
+/* Overlay covering the bottom third of the product box */
 .product__info {
-    width: 100%;
-    height: 100px;
-    margin-bottom: 15px;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 33.33%; /* Covers the bottom third */
+  background: rgba(255, 255, 255, 0.8); /* White overlay */
+  box-sizing: border-box;
+  padding: 10px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Text at top, button at bottom */
+  align-items: center;
+  border-radius: 0 0 8px 8px; /* Rounded bottom corners */
 }
 
+/* Container for text (title, price, rating) */
+.product__text {
+  width: 100%;
+  text-align: center;
+  padding-bottom: 0; /* Remove extra bottom padding */
+}
+
+.product__title {
+  font-size: 16px;
+  margin: 5px 0;
+}
 
 .product__price {
-    margin-top: 5px;
+  font-size: 20px;
+  font-weight: bold;
+  margin: 5px 0;
+}
+
+/* Button fixed at the bottom of the overlay */
+.product__button {
+  background: #94daff;
+  outline: none;
+  border: none;
+  padding: 12px 24px;                 
+  border-radius: 8px;            
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;          
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;             
+  transition: background 0.3s ease;
+  /* Flex container already handles placement so no absolute positioning */
+}
+
+.product__button:hover {
+  background: #5cbff0; 
+}
+
+.product__rating {
+  display: flex;
+  color: #FFD700;
+  margin-top: 5px;
+}
+
+.product__shipping {
+  font-weight: normal;
 }
