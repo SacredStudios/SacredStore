@@ -6,14 +6,18 @@
     position: relative;
   }
   
-  /* Set a fixed height for the banner image */
+  /* Set a fixed height for the banner image and fade it out at the bottom */
   .home__image {
     width: 100%;
     height: 400px;        /* Adjust height as needed */
     object-fit: cover;    /* Ensures the image fills the container */
     display: block;
     z-index: 0;
+    mask-image: 
+      linear-gradient(to bottom, rgba(0, 0, 0, 1) 70%, rgba(0, 0, 0, 0) 100%);
+
   }
+  
   
   /* Position the product row absolutely over the banner */
   .home__row {
