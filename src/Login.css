@@ -34,7 +34,8 @@
       transform: rotate(360deg);
     }
   }
-.login__container {
+  .login__container {
+    position: relative;
     width: 300px;
     height: fit-content;
     display: flex;
@@ -46,7 +47,7 @@
     z-index: 1;
     border-radius: 8px;   
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
+  }
 
 .login__container > h1 {
     font-weight: 300;
@@ -114,4 +115,14 @@
   .login__registerButton:hover {
     background: #5cbff0; 
     background: #dfdfdf;
+  }
+
+  .login__forgotPassword {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: gray;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: underline;
   }

@@ -7,6 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendEmailVerification,
+  sendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup
 } from "firebase/auth";
@@ -47,13 +48,6 @@ const Login = () => {
         try {
           await sendEmailVerification(user);
           alert("Verification email sent! Please check your inbox/spam folder.");
-
-          // Optionally, you could log the user out immediately after registration
-          // so they can't navigate while unverified:
-          // auth.signOut();
-
-          // If you prefer to navigate them somewhere else:
-          // navigate("/verify-instructions");
         } catch (verificationError) {
           alert("Failed to send verification email:", verificationError.message);
         }
@@ -68,14 +62,28 @@ const Login = () => {
     const provider = new GoogleAuthProvider();
     signInWithPopup(auth, provider)
       .then((result) => {
-        // Google accounts are typically already verified,
-        // but you can check if needed:
         if (result.user.emailVerified) {
           console.log("Google Sign-In successful:", result.user);
           navigate("/");
         } else {
           alert("Email is not verified. Please verify your email.");
         }
+      })
+      .catch((error) => {
+        alert(error.message);
+      });
+  };
+
+  // 4. Forgot Password Feature
+  const forgotPassword = (e) => {
+    e.preventDefault();
+    if (!email) {
+      alert("Please enter your email address in the email field first.");
+      return;
+    }
+    sendPasswordResetEmail(auth, email)
+      .then(() => {
+        alert("Password reset email sent! Please check your inbox/spam folder.");
       })
       .catch((error) => {
         alert(error.message);
@@ -93,6 +101,14 @@ const Login = () => {
       </Link>
 
       <div className="login__container">
+        {/* Forgot password clickable text */}
+        <span 
+          className="login__forgotPassword" 
+          onClick={forgotPassword}
+        >
+          Forgot my password?
+        </span>
+
         <h1>Sign In</h1>
         <form>
           <h5>Email</h5>
@@ -127,17 +143,17 @@ const Login = () => {
           Create an account
         </button>
 
-        {/* 4. Google Sign-In Button */}
+        {/* Google Sign-In Button */}
         <button className="login__registerButton" onClick={signInWithGoogle}>
-        Sign in with{" "}
-        <span className="googleLogoText">
+          Sign in with{" "}
+          <span className="googleLogoText">
             <span style={{ color: "#4285F4" }}>G</span>
             <span style={{ color: "#DB4437" }}>o</span>
             <span style={{ color: "#F4B400" }}>o</span>
             <span style={{ color: "#4285F4" }}>g</span>
             <span style={{ color: "#0F9D58" }}>l</span>
             <span style={{ color: "#DB4437" }}>e</span>
-        </span>
+          </span>
         </button>
       </div>
     </div>

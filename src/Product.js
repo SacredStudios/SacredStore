@@ -30,11 +30,7 @@ const Product = ({ title, image, price, rating, id }) => {
             <small className="product__shipping"> + shipping</small>
           </p>
           <div className="product__rating">
-            {Array(rating)
-              .fill()
-              .map((_, i) => (
-                <span key={i}>⭐</span>
-              ))}
+            
           </div>
         </div>
         <button className="product__button" onClick={addToBasket}>
