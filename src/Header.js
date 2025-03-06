@@ -79,6 +79,10 @@ const Header = () => {
     };
   }, [dragging, offset]);
 
+  // Compute username and truncate if longer than 15 characters.
+  const username = user ? user.email.split('@')[0] : 'Guest';
+  const displayUsername = username.length > 15 ? username.substring(0, 15) + '...' : username;
+
   return (
     <div 
       className="header"
@@ -97,7 +101,7 @@ const Header = () => {
         <Link to={!user && '/login'}>
           <div onClick={handleAuthentication} className="header__option">
             <span className="header__optionLineOne">
-              Hello {user ? user.email.split('@')[0] : 'Guest'}
+              Hello {displayUsername}
             </span>
             <span className="header__optionLineTwo">
               {user ? 'Sign Out' : 'Sign In'}

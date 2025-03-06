@@ -17,7 +17,7 @@ const Payment = () => {
   const stripe = useStripe();
   const elements = useElements();
   const auth = getAuth();
-
+  
   const [succeeded, setSucceeded] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
@@ -33,6 +33,7 @@ const Payment = () => {
 
   const addressInputRef = useRef(null);
 
+  // Initialize Google Places Autocomplete
   useEffect(() => {
     const loadAutocomplete = () => {
       if (
@@ -40,8 +41,10 @@ const Payment = () => {
         window.google.maps &&
         window.google.maps.places
       ) {
-        const autocomplete = new window.google.maps.places.
-          Autocomplete(addressInputRef.current, { types: ['address'] });
+        const autocomplete = new window.google.maps.places.Autocomplete(
+          addressInputRef.current,
+          { types: ['address'] }
+        );
         autocomplete.addListener('place_changed', async () => {
           const place = autocomplete.getPlace();
           const dest = place.formatted_address;
@@ -70,7 +73,7 @@ const Payment = () => {
         `/shipping/cost?address=${encodeURIComponent(dest)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log("Shipping responded");
+      console.log("Shipping responded", resp.data);
       if (resp.data.totalNetCharge !== undefined) {
         setShippingCost(resp.data.totalNetCharge);
       } else {
@@ -84,12 +87,11 @@ const Payment = () => {
     }
   };
 
-  // Auto-update PaymentIntent details as basket or address changes.
+  // Update PaymentIntent client secret whenever basket, address, or shipping changes.
   useEffect(() => {
     const getClientSecret = async () => {
       setBackendLoading(true);
-      // Only basket total (in cents) is sent.
-      const total = getBasketTotal(basket) * 100;
+      const total = getBasketTotal(basket) * 100; // in cents
       try {
         const token = await auth.currentUser.getIdToken(true);
         const resp = await axios.post(
@@ -97,7 +99,7 @@ const Payment = () => {
           { basket },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Client secret resp");
+        console.log("Client secret resp", resp.data);
         setClientSecret(resp.data.clientSecret);
         if (resp.data.taxCalculation) {
           const taxedBase = resp.data.taxCalculation.amount_total / 100;
@@ -112,8 +114,7 @@ const Payment = () => {
       }
     };
 
-    if (basket?.length > 0 && address.trim() !== '' &&
-        !shippingCostLoading) {
+    if (basket?.length > 0 && address.trim() !== '' && !shippingCostLoading) {
       const timer = setTimeout(() => {
         getClientSecret();
       }, 500);
@@ -148,9 +149,7 @@ const Payment = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       // Save order details in Firestore.
-      const orderRef = doc(
-        db, 'users', user?.uid, 'orders', paymentIntent.id
-      );
+      const orderRef = doc(db, 'users', user?.uid, 'orders', paymentIntent.id);
       await setDoc(orderRef, {
         basket,
         amount: paymentIntent.amount,
@@ -187,11 +186,13 @@ const Payment = () => {
             <h3>Delivery Address</h3>
           </div>
           <div className="payment__address">
-            <input type="text"
+            <input
+              type="text"
               placeholder="Enter your address"
               ref={addressInputRef}
               value={address}
-              onChange={(e) => setAddress(e.target.value)} />
+              onChange={(e) => setAddress(e.target.value)}
+            />
           </div>
         </div>
         <div className="payment__section">
@@ -200,9 +201,7 @@ const Payment = () => {
           </div>
           <div className="payment__shipping">
             <p>
-              Shipping: $
-              {shippingCost != null ?
-                Number(shippingCost).toFixed(2) : '0.00'}
+              Shipping: ${shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}
               {shippingCostLoading && " (loading...)"}
             </p>
           </div>
@@ -213,11 +212,13 @@ const Payment = () => {
           </div>
           <div className="payment__items">
             {basket.map((item) => (
-              <CheckoutProduct key={item.id}
+              <CheckoutProduct
+                key={item.id}
                 id={item.id}
                 title={item.title}
                 image={item.image}
-                price={item.price} />
+                price={item.price}
+              />
             ))}
           </div>
         </div>
@@ -230,30 +231,28 @@ const Payment = () => {
               <CardElement onChange={handleChange} />
               <div className="payment__priceContainer">
                 <p>Tax: ${taxAmount.toFixed(2)}</p>
-                <p>Shipping: $
-                  {shippingCost != null ?
-                    Number(shippingCost).toFixed(2) : '0.00'}
-                </p>
+                <p>Shipping: ${shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}</p>
                 <CurrencyFormat
                   renderText={(value) => <h3>Total: {value}</h3>}
                   decimalScale={2}
                   value={finalTotal}
                   displayType={'text'}
                   thousandSeparator={true}
-                  prefix={'$'} />
-                <button disabled={
-                  processing ||
-                  cardEmpty ||
-                  succeeded ||
-                  !taxCalculated ||
-                  backendLoading ||
-                  shippingCostLoading ||
-                  !address.trim() ||
-                  taxAmount === 0
-                }>
-                  <span>
-                    {processing ? <p>Processing</p> : 'Buy Now'}
-                  </span>
+                  prefix={'$'}
+                />
+                <button
+                  disabled={
+                    processing ||
+                    cardEmpty ||
+                    succeeded ||
+                    !taxCalculated ||
+                    backendLoading ||
+                    shippingCostLoading ||
+                    !address.trim() ||
+                    taxAmount === 0
+                  }
+                >
+                  <span>{processing ? <p>Processing</p> : 'Buy Now'}</span>
                 </button>
               </div>
               {error && <div className="payment__error">{error}</div>}
