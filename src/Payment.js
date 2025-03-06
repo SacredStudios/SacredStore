@@ -33,6 +33,7 @@ const Payment = () => {
 
   const addressInputRef = useRef(null);
 
+
   // Initialize Google Places Autocomplete
   useEffect(() => {
     const loadAutocomplete = () => {
