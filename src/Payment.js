@@ -136,19 +136,29 @@ const Payment = () => {
     setProcessing(true);
     try {
       const { paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret, {
+        clientSecret,
+        {
           payment_method: {
             card: elements.getElement(CardElement)
           }
         }
       );
-      // After confirming payment, send order email.
-      const token = await auth.currentUser.getIdToken(true);
-      await axios.post(
-        `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
-        { basket },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      
+      // Only proceed if the payment succeeded
+      if (paymentIntent.status === "succeeded") {
+        // Send order email only if the payment is successful
+        const token = await auth.currentUser.getIdToken(true);
+        await axios.post(
+          `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
+          { basket },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } else {
+        setError('Payment was not successful. Please try again.');
+        setProcessing(false);
+        return;
+      }
+      
       // Save order details in Firestore.
       const orderRef = doc(db, 'users', user?.uid, 'orders', paymentIntent.id);
       await setDoc(orderRef, {
@@ -170,6 +180,7 @@ const Payment = () => {
       setProcessing(false);
     }
   };
+  
 
   const handleChange = (event) => {
     setCardEmpty(event.empty);
