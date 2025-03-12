@@ -4,4 +4,14 @@
 
 .orders > h1 {
     margin: 30px 0;
+}@media screen and (max-width: 768px) {
+    .orders {
+        padding: 10px 20px;  /* Reduce padding for better mobile spacing */
+    }
+
+    .orders > h1 {
+        margin: 20px 0;  /* Slightly smaller margin for compact spacing */
+        font-size: 1.5rem; /* Reduce font size for better readability */
+        text-align: center; /* Center text on small screens */
+    }
 }
