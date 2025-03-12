@@ -32,3 +32,9 @@
     margin: 0 5px;
   }
   
+  @media screen and (max-width: 768px) {
+    .home__image {
+        height: 25vh;  /* Reduce height to half of viewport height */
+        max-height: 150px; /* Prevent it from being too large */
+    }
+}
