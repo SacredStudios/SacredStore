@@ -30,9 +30,26 @@ const Payment = () => {
   const [taxCalculated, setTaxCalculated] = useState(false);
   const [backendLoading, setBackendLoading] = useState(false);
   const [shippingCostLoading, setShippingCostLoading] = useState(false);
+  // State controlling when the payment method section is enabled (and visible)
+  const [ccEnabled, setCcEnabled] = useState(false);
 
   const addressInputRef = useRef(null);
 
+  // Enable the credit card screen only when:
+  // - A valid address is entered
+  // - The cart is not empty
+  // - And 5 seconds have passed after entering the address
+  useEffect(() => {
+    if (address.trim() && basket?.length > 0) {
+      setCcEnabled(false); // Disable immediately when conditions change
+      const timer = setTimeout(() => {
+        setCcEnabled(true);
+      }, 5000); // 5-second delay
+      return () => clearTimeout(timer);
+    } else {
+      setCcEnabled(false);
+    }
+  }, [address, basket]);
 
   // Initialize Google Places Autocomplete
   useEffect(() => {
@@ -146,7 +163,6 @@ const Payment = () => {
       
       // Only proceed if the payment succeeded
       if (paymentIntent.status === "succeeded") {
-        // Send order email only if the payment is successful
         const token = await auth.currentUser.getIdToken(true);
         await axios.post(
           `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
@@ -181,7 +197,6 @@ const Payment = () => {
     }
   };
   
-
   const handleChange = (event) => {
     setCardEmpty(event.empty);
     setError(event.error ? event.error.message : '');
@@ -234,43 +249,58 @@ const Payment = () => {
             ))}
           </div>
         </div>
-        <div className="payment__section">
-          <div className="payment__title">
-            <h3>Payment Method</h3>
+        {/* Payment Method section is hidden until all conditions are met.
+            Once shipping info (and tax) is calculated, show "Loading..." until ccEnabled becomes true. */}
+        { basket?.length > 0 && address.trim() !== '' && taxCalculated ? (
+          <div className="payment__section">
+            <div className="payment__title">
+              <h3>Payment Method</h3>
+            </div>
+            <div className="payment__details">
+              { !ccEnabled ? (
+                <div className="payment__loading">
+                  Loading...
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit}>
+                  <CardElement 
+                    options={{ disabled: !ccEnabled || basket?.length === 0 }}
+                    onChange={handleChange} 
+                  />
+                  <div className="payment__priceContainer">
+                    <p>Tax: ${taxAmount.toFixed(2)}</p>
+                    <p>Shipping: ${shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}</p>
+                    <CurrencyFormat
+                      renderText={(value) => <h3>Total: {value}</h3>}
+                      decimalScale={2}
+                      value={finalTotal}
+                      displayType={'text'}
+                      thousandSeparator={true}
+                      prefix={'$'}
+                    />
+                    <button
+                      disabled={
+                        processing ||
+                        cardEmpty ||
+                        succeeded ||
+                        !taxCalculated ||
+                        backendLoading ||
+                        shippingCostLoading ||
+                        !address.trim() ||
+                        taxAmount === 0 ||
+                        !ccEnabled ||
+                        basket.length === 0
+                      }
+                    >
+                      <span>{processing ? <p>Processing</p> : 'Buy Now'}</span>
+                    </button>
+                  </div>
+                  {error && <div className="payment__error">{error}</div>}
+                </form>
+              )}
+            </div>
           </div>
-          <div className="payment__details">
-            <form onSubmit={handleSubmit}>
-              <CardElement onChange={handleChange} />
-              <div className="payment__priceContainer">
-                <p>Tax: ${taxAmount.toFixed(2)}</p>
-                <p>Shipping: ${shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}</p>
-                <CurrencyFormat
-                  renderText={(value) => <h3>Total: {value}</h3>}
-                  decimalScale={2}
-                  value={finalTotal}
-                  displayType={'text'}
-                  thousandSeparator={true}
-                  prefix={'$'}
-                />
-                <button
-                  disabled={
-                    processing ||
-                    cardEmpty ||
-                    succeeded ||
-                    !taxCalculated ||
-                    backendLoading ||
-                    shippingCostLoading ||
-                    !address.trim() ||
-                    taxAmount === 0
-                  }
-                >
-                  <span>{processing ? <p>Processing</p> : 'Buy Now'}</span>
-                </button>
-              </div>
-              {error && <div className="payment__error">{error}</div>}
-            </form>
-          </div>
-        </div>
+        ) : null }
       </div>
     </div>
   );
