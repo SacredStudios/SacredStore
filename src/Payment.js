@@ -35,6 +35,15 @@ const Payment = () => {
 
   const addressInputRef = useRef(null);
 
+  // On mount, check sessionStorage for a stored delivery address
+  useEffect(() => {
+    const storedAddress = sessionStorage.getItem("deliveryAddress");
+    if (storedAddress) {
+      setAddress(storedAddress);
+      sessionStorage.removeItem("deliveryAddress");
+    }
+  }, []);
+
   // Enable the credit card screen only when:
   // - A valid address is entered
   // - The cart is not empty
@@ -161,19 +170,21 @@ const Payment = () => {
         }
       );
       
-      // Only proceed if the payment succeeded
-      if (paymentIntent.status === "succeeded") {
-        const token = await auth.currentUser.getIdToken(true);
-        await axios.post(
-          `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
-          { basket },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-      } else {
-        setError('Payment was not successful. Please try again.');
-        setProcessing(false);
+      // If payment fails, alert the user, store the address, and reload the page.
+      if (paymentIntent.status !== "succeeded") {
+        window.alert("Payment failed. Please make sure all your details are correct. For more info, please contact me at xsacredstudiosx@gmail.com");
+        sessionStorage.setItem("deliveryAddress", address);
+        window.location.reload();
         return;
       }
+      
+      // Send order email only if payment succeeded.
+      const token = await auth.currentUser.getIdToken(true);
+      await axios.post(
+        `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
+        { basket },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
       // Save order details in Firestore.
       const orderRef = doc(db, 'users', user?.uid, 'orders', paymentIntent.id);
@@ -192,11 +203,13 @@ const Payment = () => {
       navigate('/orders', { replace: true });
     } catch (err) {
       console.error('Error confirming payment:', err);
-      setError(err.message);
+      window.alert("Payment failed. Please make sure all your details are correct.");
+      sessionStorage.setItem("deliveryAddress", address);
+      window.location.reload();
       setProcessing(false);
     }
   };
-  
+
   const handleChange = (event) => {
     setCardEmpty(event.empty);
     setError(event.error ? event.error.message : '');
@@ -249,8 +262,6 @@ const Payment = () => {
             ))}
           </div>
         </div>
-        {/* Payment Method section is hidden until all conditions are met.
-            Once shipping info (and tax) is calculated, show "Loading..." until ccEnabled becomes true. */}
         { basket?.length > 0 && address.trim() !== '' && taxCalculated ? (
           <div className="payment__section">
             <div className="payment__title">
