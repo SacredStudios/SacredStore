@@ -30,12 +30,12 @@ const Payment = () => {
   const [taxCalculated, setTaxCalculated] = useState(false);
   const [backendLoading, setBackendLoading] = useState(false);
   const [shippingCostLoading, setShippingCostLoading] = useState(false);
-  // State controlling when the payment method section is enabled (and visible)
+  // Controls when the payment method section is enabled (and visible)
   const [ccEnabled, setCcEnabled] = useState(false);
 
   const addressInputRef = useRef(null);
 
-  // On mount, check sessionStorage for a stored delivery address
+  // On mount, check sessionStorage for a stored delivery address.
   useEffect(() => {
     const storedAddress = sessionStorage.getItem("deliveryAddress");
     if (storedAddress) {
@@ -44,23 +44,33 @@ const Payment = () => {
     }
   }, []);
 
+  // New useEffect to re-fetch shipping cost whenever address is set (e.g., on reload)
+  useEffect(() => {
+    if (address.trim() !== '') {
+      const timer = setTimeout(() => {
+        fetchShippingCost(address);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [address]);
+
   // Enable the credit card screen only when:
-  // - A valid address is entered
-  // - The cart is not empty
-  // - And 5 seconds have passed after entering the address
+  // - A valid address is entered,
+  // - The cart is not empty,
+  // - And 5 seconds have passed after entering the address.
   useEffect(() => {
     if (address.trim() && basket?.length > 0) {
-      setCcEnabled(false); // Disable immediately when conditions change
+      setCcEnabled(false); // Disable immediately when conditions change.
       const timer = setTimeout(() => {
         setCcEnabled(true);
-      }, 5000); // 5-second delay
+      }, 5000); // 5-second delay.
       return () => clearTimeout(timer);
     } else {
       setCcEnabled(false);
     }
   }, [address, basket]);
 
-  // Initialize Google Places Autocomplete
+  // Initialize Google Places Autocomplete.
   useEffect(() => {
     const loadAutocomplete = () => {
       if (
@@ -170,9 +180,9 @@ const Payment = () => {
         }
       );
       
-      // If payment fails, alert the user, store the address, and reload the page.
+      // If payment fails, alert the user, preserve the address, and reload.
       if (paymentIntent.status !== "succeeded") {
-        window.alert("Payment failed. Please make sure all your details are correct. For more info, please contact me at xsacredstudiosx@gmail.com");
+        window.alert("Payment failed. Please make sure all your details are correct.");
         sessionStorage.setItem("deliveryAddress", address);
         window.location.reload();
         return;
