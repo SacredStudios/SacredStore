@@ -1,3 +1,6 @@
+/* eslint max-len: ["error", { "code": 80 }] */
+/* eslint valid-jsdoc: ["error", { "requireParamDescription": false }] */
+
 const functions = require("firebase-functions");
 const express = require("express");
 const cors = require("cors");
@@ -10,7 +13,10 @@ admin.initializeApp();
 
 const app = express();
 
-// Global middleware to catch all OPTIONS requests
+/**
+ * Global middleware to catch all OPTIONS requests
+ * and set required CORS headers.
+ */
 app.use((req, res, next) => {
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -36,8 +42,7 @@ const configData = functions.config();
 const FEDEX_API_KEY = configData.fedex.api_key;
 const FEDEX_SECRET_KEY = configData.fedex.secret_key;
 const FEDEX_TOKEN_URL = "https://apis.fedex.com/oauth/token";
-const FEDEX_RATE_URL =
-  "https://apis.fedex.com/rate/v1/rates/quotes";
+const FEDEX_RATE_URL = "https://apis.fedex.com/rate/v1/rates/quotes";
 
 const stripeKey1 = configData.stripe.key1;
 const stripeKey2 = configData.stripe.key2;
@@ -75,7 +80,7 @@ function getCountryCode(address) {
   if (lower.includes("united kingdom") || lower.includes("uk")) {
     return "GB";
   }
-  return "US";
+  return "US"; // fallback
 }
 
 /**
@@ -96,8 +101,7 @@ async function calculateFedExShipping(destAddr) {
       }).toString(),
     });
     const tokenText = await tokenRes.text();
-    console.log("DEBUG: Token status:", tokenRes.status);
-    console.log("DEBUG: Token text:", tokenText);
+
     if (!tokenRes.ok) {
       let errResp;
       try {
@@ -108,25 +112,27 @@ async function calculateFedExShipping(destAddr) {
       console.error("FedEx token error:", errResp);
       throw new Error(
           `Failed to fetch token (status ${tokenRes.status}): ` +
-          JSON.stringify(errResp),
+        JSON.stringify(errResp),
       );
     }
+
     let tokenData;
     try {
       tokenData = JSON.parse(tokenText);
     } catch (err) {
       throw new Error(`Invalid token JSON: ${tokenText}`);
     }
+
     const accessToken = tokenData.access_token;
     if (!accessToken) {
       throw new Error("No FedEx token in response");
     }
+
     const zipRegex = /\b\d{5}(?:-\d{4})?\b/;
     const zipMatch = destAddr.match(zipRegex);
     const rPostal = zipMatch ? zipMatch[0] : "30033";
-    console.log("DEBUG: Extracted ZIP:", rPostal);
     const rCountry = getCountryCode(destAddr);
-    console.log("DEBUG: Recipient country:", rCountry);
+
     let serviceType = "FEDEX_GROUND";
     const reqBody = {
       accountNumber: {value: "204492269"},
@@ -141,6 +147,7 @@ async function calculateFedExShipping(destAddr) {
         ],
       },
     };
+
     if (rCountry !== "US") {
       serviceType = "INTERNATIONAL_ECONOMY";
       reqBody.requestedShipment.customsClearanceDetail = {
@@ -157,7 +164,7 @@ async function calculateFedExShipping(destAddr) {
       };
     }
     reqBody.requestedShipment.serviceType = serviceType;
-    console.log("DEBUG: Payload:", JSON.stringify(reqBody, null, 2));
+
     const rateRes = await fetch(FEDEX_RATE_URL, {
       method: "POST",
       headers: {
@@ -168,8 +175,7 @@ async function calculateFedExShipping(destAddr) {
       body: JSON.stringify(reqBody),
     });
     const rateText = await rateRes.text();
-    console.log("DEBUG: Rate status:", rateRes.status);
-    console.log("DEBUG: Rate text:", rateText);
+
     if (!rateRes.ok) {
       let errRate;
       try {
@@ -180,9 +186,10 @@ async function calculateFedExShipping(destAddr) {
       console.error("FedEx rate error:", errRate);
       throw new Error(
           `Failed to fetch rates (status ${rateRes.status}): ` +
-          JSON.stringify(errRate),
+        JSON.stringify(errRate),
       );
     }
+
     let rateData;
     try {
       rateData = JSON.parse(rateText);
@@ -190,6 +197,7 @@ async function calculateFedExShipping(destAddr) {
       console.error("DEBUG: Error parsing rate JSON:", err);
       throw new Error("FedEx rate returned invalid JSON");
     }
+
     let netCharge = 0;
     if (rateData.output && Array.isArray(rateData.output.rateReplyDetails)) {
       for (const detail of rateData.output.rateReplyDetails) {
@@ -216,6 +224,7 @@ async function calculateFedExShipping(destAddr) {
     return netCharge;
   } catch (err) {
     console.error("FedEx error:", err);
+    // Fallback shipping cost
     return 20;
   }
 }
@@ -223,10 +232,10 @@ async function calculateFedExShipping(destAddr) {
 /**
  * Middleware to verify Firebase Auth token and attach user.
  *
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
- * @param {Function} next Next function.
- * @return {Promise<void>}
+ * @param {Object} req - Express request
+ * @param {Object} res - Express response
+ * @param {Function} next - Next middleware
+ * @returns {Object} The response if unauthorized; otherwise next()
  */
 async function checkAuth(req, res, next) {
   const authHeader = req.headers.authorization || "";
@@ -247,36 +256,24 @@ async function checkAuth(req, res, next) {
 app.get("/", (req, res) => res.send("Hello world!"));
 
 /**
- * Route to get shipping cost.
- */
-app.get("/shipping/cost", checkAuth, async (req, res, next) => {
-  try {
-    const addr = req.query.address || "";
-    if (!addr) {
-      return res.status(400).send({error: "Address is required"});
-    }
-    const netCharge = await calculateFedExShipping(addr);
-    return res.status(200).send({totalNetCharge: netCharge});
-  } catch (error) {
-    console.error("Error calculating shipping:", error);
-    next(error);
-  }
-});
-
-/**
- * Route to create PaymentIntent with shipping and tax.
- * Shipping is excluded from taxed base.
- * Does NOT send email.
+ * Create payment without taxes, just shipping + base total.
+ *
+ * @param {Object} req - Express request
+ * @param {Object} res - Express response
+ * @param {Function} next - Next middleware
+ * @returns {Promise<Object>} JSON response with PaymentIntent info
  */
 app.post("/payments/create", checkAuth, async (req, res, next) => {
   try {
+    // 'total' is basket subtotal in cents
     const total = parseInt(req.query.total || "0", 10);
     const addr = req.query.address || "";
-    console.log("Received total:", total);
+
     const netCharge = await calculateFedExShipping(addr);
-    console.log("Extracted totalNetCharge:", netCharge);
     const shippingCents = Math.round(netCharge * 100);
-    const baseAmount = total;
+    const finalAmount = total + shippingCents;
+
+    // Minimal address parsing for shipping details
     const parts = addr.split(",").map((s) => s.trim());
     const customerAddress = {
       line1: parts[0] || "unknown",
@@ -285,42 +282,21 @@ app.post("/payments/create", checkAuth, async (req, res, next) => {
       postal_code: parts[3] || "30033",
       country: parts[4] || getCountryCode(addr),
     };
-    let taxCalc;
-    try {
-      taxCalc = await stripe.tax.calculations.create({
-        currency: "usd",
-        line_items: [{amount: baseAmount, reference: "L1"}],
-        customer_details: {
-          address: customerAddress,
-          address_source: "shipping",
-        },
-      });
-      if (!taxCalc.tax_amount_exclusive || taxCalc.tax_amount_exclusive === 0) {
-        throw new Error("No tax generated");
-      }
-    } catch (taxErr) {
-      console.error("Error during tax calc:", taxErr);
-      const fbTax = Math.round(baseAmount * 0.1);
-      taxCalc = {
-        id: "fallback",
-        amount_total: baseAmount + fbTax,
-        tax_amount_exclusive: fbTax,
-      };
-    }
-    const finalAmount = taxCalc.amount_total + shippingCents;
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: finalAmount,
       currency: "usd",
-      shipping: {name: "Customer", address: customerAddress},
-      metadata: {tax_calculation_id: taxCalc.id},
+      shipping: {
+        name: "Customer",
+        address: customerAddress,
+      },
     });
-    console.log("Returning client secret:", paymentIntent.client_secret);
+
     return res.status(201).send({
       clientSecret: paymentIntent.client_secret,
-      shippingCost: shippingCents,
-      totalNetCharge: netCharge,
-      baseAmount: baseAmount,
-      taxCalculation: taxCalc,
+      shippingCost: shippingCents, // shipping in cents
+      totalNetCharge: netCharge, // shipping in dollars
+      baseAmount: total, // basket total in cents
     });
   } catch (e) {
     console.error("Error in payments/create:", e);
@@ -329,8 +305,12 @@ app.post("/payments/create", checkAuth, async (req, res, next) => {
 });
 
 /**
- * Endpoint to send order email.
- * This is called only when "Buy Now" is pressed.
+ * Endpoint to send order email. Called when "Buy Now" is pressed.
+ *
+ * @param {Object} req - Express request
+ * @param {Object} res - Express response
+ * @param {Function} next - Next middleware
+ * @returns {Promise<Object>} Express response with success message
  */
 app.post("/payments/notify", checkAuth, async (req, res, next) => {
   try {
@@ -338,18 +318,28 @@ app.post("/payments/notify", checkAuth, async (req, res, next) => {
     if (basketItems.length === 0) {
       return res.status(400).send({error: "Basket is empty"});
     }
+
     const addr = req.query.address || "";
+    const phone = req.query.phone || "";
     const orderDetails = `
       <p>User: ${req.user ? req.user.email : "Unknown"}</p>
       <p>Location: ${addr}</p>
+      ${
+        phone ?
+          `<p>Phone: ${phone}</p>` :
+          ""
+}
       <p>Ordered Items:</p>
       <ul>
-        ${basketItems.map((item) =>
-    `<li>${item.title} - $${item.price}<br/>
-    <img src="${item.image}" width="100"/></li>`,
-  ).join("")}
+        ${basketItems
+      .map((item) => `
+            <li>${item.title} - $${item.price}<br/>
+              <img src="${item.image}" width="100"/>
+            </li>`)
+      .join("")}
       </ul>
     `;
+
     const mailOpts = {
       from: EMAIL_USER,
       to: [
@@ -359,6 +349,7 @@ app.post("/payments/notify", checkAuth, async (req, res, next) => {
       subject: `New Order from ${req.user ? req.user.email : "Unknown"}`,
       html: orderDetails,
     };
+
     await transporter.sendMail(mailOpts);
     return res.status(200).send({message: "Email sent"});
   } catch (e) {
@@ -366,7 +357,20 @@ app.post("/payments/notify", checkAuth, async (req, res, next) => {
     next(e);
   }
 });
-
+app.get("/shipping/cost", checkAuth, async (req, res, next) => {
+  try {
+    const addr = req.query.address || "";
+    if (!addr.trim()) {
+      return res.status(400).send({error: "Address is required"});
+    }
+    const netCharge = await calculateFedExShipping(addr);
+    return res.status(200).send({totalNetCharge: netCharge});
+  } catch (error) {
+    console.error("Error calculating shipping:", error);
+    next(error);
+  }
+});
+// Express error handler
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
   res.set("Access-Control-Allow-Origin", "*");

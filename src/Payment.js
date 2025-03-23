@@ -17,25 +17,32 @@ const Payment = () => {
   const stripe = useStripe();
   const elements = useElements();
   const auth = getAuth();
-  
+
   const [succeeded, setSucceeded] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [cardEmpty, setCardEmpty] = useState(true);
   const [clientSecret, setClientSecret] = useState(null);
   const [address, setAddress] = useState('');
-  const [shippingCost, setShippingCost] = useState(0);
-  const [taxAmount, setTaxAmount] = useState(0);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [shippingCost, setShippingCost] = useState(0); // in dollars
   const [finalTotal, setFinalTotal] = useState(0);
-  const [taxCalculated, setTaxCalculated] = useState(false);
   const [backendLoading, setBackendLoading] = useState(false);
   const [shippingCostLoading, setShippingCostLoading] = useState(false);
-  // Controls when the payment method section is enabled (and visible)
   const [ccEnabled, setCcEnabled] = useState(false);
 
   const addressInputRef = useRef(null);
 
-  // On mount, check sessionStorage for a stored delivery address.
+  // Helper to detect "outside the US"
+  const isOutsideUS = (addr) => {
+    const lower = addr.toLowerCase();
+    if (lower.includes("united states") || lower.includes("usa")) {
+      return false;
+    }
+    return true;
+  };
+
+  // On mount, check sessionStorage for a stored delivery address
   useEffect(() => {
     const storedAddress = sessionStorage.getItem("deliveryAddress");
     if (storedAddress) {
@@ -44,7 +51,7 @@ const Payment = () => {
     }
   }, []);
 
-  // New useEffect to re-fetch shipping cost whenever address is set (e.g., on reload)
+  // Debounced address => fetch shipping cost
   useEffect(() => {
     if (address.trim() !== '') {
       const timer = setTimeout(() => {
@@ -54,30 +61,23 @@ const Payment = () => {
     }
   }, [address]);
 
-  // Enable the credit card screen only when:
-  // - A valid address is entered,
-  // - The cart is not empty,
-  // - And 5 seconds have passed after entering the address.
+  // Enable CC only after 5 seconds, if we have a valid address and non-empty basket
   useEffect(() => {
     if (address.trim() && basket?.length > 0) {
-      setCcEnabled(false); // Disable immediately when conditions change.
+      setCcEnabled(false);
       const timer = setTimeout(() => {
         setCcEnabled(true);
-      }, 5000); // 5-second delay.
+      }, 5000);
       return () => clearTimeout(timer);
     } else {
       setCcEnabled(false);
     }
   }, [address, basket]);
 
-  // Initialize Google Places Autocomplete.
+  // Google Places Autocomplete
   useEffect(() => {
     const loadAutocomplete = () => {
-      if (
-        window.google &&
-        window.google.maps &&
-        window.google.maps.places
-      ) {
+      if (window.google && window.google.maps && window.google.maps.places) {
         const autocomplete = new window.google.maps.places.Autocomplete(
           addressInputRef.current,
           { types: ['address'] }
@@ -86,7 +86,6 @@ const Payment = () => {
           const place = autocomplete.getPlace();
           const dest = place.formatted_address;
           setAddress(dest);
-          console.log("Autocomplete changed");
           await fetchShippingCost(dest);
         });
       } else {
@@ -102,7 +101,6 @@ const Payment = () => {
   }, []);
 
   const fetchShippingCost = async (dest) => {
-    console.log("fetchShippingCost");
     setShippingCostLoading(true);
     try {
       const token = await auth.currentUser.getIdToken(true);
@@ -110,7 +108,6 @@ const Payment = () => {
         `/shipping/cost?address=${encodeURIComponent(dest)}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      console.log("Shipping responded", resp.data);
       if (resp.data.totalNetCharge !== undefined) {
         setShippingCost(resp.data.totalNetCharge);
       } else {
@@ -124,26 +121,24 @@ const Payment = () => {
     }
   };
 
-  // Update PaymentIntent client secret whenever basket, address, or shipping changes.
+  // Update PaymentIntent whenever basket, address, or shipping changes
   useEffect(() => {
     const getClientSecret = async () => {
       setBackendLoading(true);
-      const total = getBasketTotal(basket) * 100; // in cents
+      const totalInCents = getBasketTotal(basket) * 100;
       try {
         const token = await auth.currentUser.getIdToken(true);
         const resp = await axios.post(
-          `/payments/create?total=${total}&address=${encodeURIComponent(address)}`,
+          `/payments/create?total=${totalInCents}&address=${encodeURIComponent(address)}`,
           { basket },
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        console.log("Client secret resp", resp.data);
+
         setClientSecret(resp.data.clientSecret);
-        if (resp.data.taxCalculation) {
-          const taxedBase = resp.data.taxCalculation.amount_total / 100;
-          setTaxAmount(resp.data.taxCalculation.tax_amount_exclusive / 100);
-          setFinalTotal(taxedBase + shippingCost);
-          setTaxCalculated(true);
-        }
+
+        // finalTotal in USD = (baseAmount + shippingCost) / 100
+        const finalInCents = resp.data.baseAmount + resp.data.shippingCost;
+        setFinalTotal(finalInCents / 100);
       } catch (err) {
         console.error('Error fetching client secret:', err);
       } finally {
@@ -161,6 +156,13 @@ const Payment = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+  
+    // If outside the US, phone number is required
+    if (isOutsideUS(address) && !phoneNumber.trim()) {
+      setError('Phone number is required for international shipments.');
+      return;
+    }
+  
     if (!address.trim()) {
       setError('Please enter a valid address.');
       return;
@@ -169,61 +171,86 @@ const Payment = () => {
       setError('Client secret not ready. Please try again.');
       return;
     }
+  
     setProcessing(true);
+  
     try {
-      const { paymentIntent } = await stripe.confirmCardPayment(
+      // 1) Confirm the payment with Stripe
+      const { paymentIntent, error: stripeError } = await stripe.confirmCardPayment(
         clientSecret,
         {
           payment_method: {
-            card: elements.getElement(CardElement)
-          }
+            card: elements.getElement(CardElement),
+          },
         }
       );
-      
-      // If payment fails, alert the user, preserve the address, and reload.
-      if (paymentIntent.status !== "succeeded") {
-        window.alert("Payment failed. Please make sure all your details are correct.");
-        sessionStorage.setItem("deliveryAddress", address);
-        window.location.reload();
-        return;
+  
+      // 2) If Stripe returned an error object, treat as failed.
+      if (stripeError) {
+        throw new Error(`Stripe payment error: ${stripeError.message}`);
       }
       
-      // Send order email only if payment succeeded.
+      // 3) If paymentIntent is missing or status is not 'succeeded',
+      //    we consider it a failure. (Adjust if you want to allow 'processing'.)
+      if (!paymentIntent || paymentIntent.status !== "succeeded") {
+        throw new Error(
+          `Payment was not successful. Status: ${paymentIntent?.status || "N/A"}`
+        );
+      }
+  
+      // 4) At this point, we know the payment truly succeeded.
+      //    Next, attempt to send the order email:
       const token = await auth.currentUser.getIdToken(true);
       await axios.post(
-        `/payments/notify?address=${encodeURIComponent(address)}&email=${encodeURIComponent(user.email)}`,
+        `/payments/notify?address=${encodeURIComponent(address)}&phone=${encodeURIComponent(phoneNumber)}`,
         { basket },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      
-      // Save order details in Firestore.
+  
+      // 5) Since email was sent successfully, write order to Firestore
       const orderRef = doc(db, 'users', user?.uid, 'orders', paymentIntent.id);
       await setDoc(orderRef, {
         basket,
-        amount: paymentIntent.amount,
+        amount: paymentIntent.amount,  // in cents
         created: paymentIntent.created,
         address,
         shippingCost,
-        tax: taxAmount,
+        phoneNumber,
       });
+  
+      // 6) Mark as succeeded in the UI
       dispatch({ type: 'EMPTY_BASKET' });
       setSucceeded(true);
       setError(null);
       setProcessing(false);
       navigate('/orders', { replace: true });
+  
     } catch (err) {
-      console.error('Error confirming payment:', err);
-      window.alert("Payment failed. Please make sure all your details are correct.");
+      console.error('Error during payment or email:', err);
+  
+      // 7) Show failure message, preserve address in sessionStorage if you want
+      window.alert("Order failed. Please check your details and try again.");
       sessionStorage.setItem("deliveryAddress", address);
+  
+      // Optional: window.location.reload() or a less disruptive approach
       window.location.reload();
+  
       setProcessing(false);
     }
   };
+  
+  
 
   const handleChange = (event) => {
     setCardEmpty(event.empty);
     setError(event.error ? event.error.message : '');
   };
+
+  // Hide the CC form if:
+  //  (1) ccEnabled is false (i.e. haven't waited 5s or no valid address/basket)
+  //  (2) or user is outside the US and hasn't put in phone number
+  const hideCcForm =
+    !ccEnabled || (isOutsideUS(address) && !phoneNumber.trim());
 
   return (
     <div className="payment">
@@ -231,6 +258,8 @@ const Payment = () => {
         <h1>
           Checkout <Link to="/checkout">({basket?.length} items)</Link>
         </h1>
+
+        {/* Delivery Address */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Delivery Address</h3>
@@ -245,17 +274,41 @@ const Payment = () => {
             />
           </div>
         </div>
+
+        {/* If outside the US => request phone number */}
+        {isOutsideUS(address) && (
+          <div className="payment__section">
+            <div className="payment__title">
+              <h3>Phone Number (Required for International Shipping)</h3>
+            </div>
+            <div className="payment__address">
+              <input
+                type="tel"
+                placeholder="e.g. +44 20 7946 0018"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Shipping Cost */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Shipping Cost</h3>
           </div>
           <div className="payment__shipping">
             <p>
-              Shipping: ${shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}
-              {shippingCostLoading && " (loading...)"}
+              Shipping: $
+              {shippingCost != null
+                ? Number(shippingCost).toFixed(2)
+                : '0.00'}
+              {shippingCostLoading && ' (loading...)'}
             </p>
           </div>
         </div>
+
+        {/* Review Items */}
         <div className="payment__section">
           <div className="payment__title">
             <h3>Review Items</h3>
@@ -272,44 +325,46 @@ const Payment = () => {
             ))}
           </div>
         </div>
-        { basket?.length > 0 && address.trim() !== '' && taxCalculated ? (
+
+        {/* Payment Method */}
+        {basket?.length > 0 && address.trim() !== '' && (
           <div className="payment__section">
             <div className="payment__title">
               <h3>Payment Method</h3>
             </div>
             <div className="payment__details">
-              { !ccEnabled ? (
+              {hideCcForm ? (
                 <div className="payment__loading">
-                  Loading...
+                  {/* Customize any text you want here */}
+                  {isOutsideUS(address) && !phoneNumber.trim()
+                    ? 'Please provide your phone number for international shipping.'
+                    : 'Loading...'}
                 </div>
               ) : (
                 <form onSubmit={handleSubmit}>
-                  <CardElement 
-                    options={{ disabled: !ccEnabled || basket?.length === 0 }}
-                    onChange={handleChange} 
+                  <CardElement
+                    options={{
+                      disabled: !ccEnabled || basket?.length === 0,
+                    }}
+                    onChange={handleChange}
                   />
                   <div className="payment__priceContainer">
-                    <p>Tax: ${taxAmount.toFixed(2)}</p>
-                    <p>Shipping: ${shippingCost != null ? Number(shippingCost).toFixed(2) : '0.00'}</p>
                     <CurrencyFormat
                       renderText={(value) => <h3>Total: {value}</h3>}
                       decimalScale={2}
                       value={finalTotal}
-                      displayType={'text'}
-                      thousandSeparator={true}
-                      prefix={'$'}
+                      displayType="text"
+                      thousandSeparator
+                      prefix="$"
                     />
                     <button
                       disabled={
                         processing ||
                         cardEmpty ||
                         succeeded ||
-                        !taxCalculated ||
                         backendLoading ||
                         shippingCostLoading ||
                         !address.trim() ||
-                        taxAmount === 0 ||
-                        !ccEnabled ||
                         basket.length === 0
                       }
                     >
@@ -321,7 +376,7 @@ const Payment = () => {
               )}
             </div>
           </div>
-        ) : null }
+        )}
       </div>
     </div>
   );
